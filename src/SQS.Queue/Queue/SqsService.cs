@@ -10,30 +10,25 @@ namespace SQS.Queue.Queue
     public class SqsService : ISqsService
     {
         private readonly AmazonSQSClient _cliente;
-        public SqsService()
-        {
-            _cliente = new AmazonSQSClient();
-        }
-        public async Task DeleteAsyncMessage(string QueueUrl, string Id)
-        {
-            await _cliente.DeleteMessageAsync(QueueUrl, Id);
-        }
+        public SqsService() => _cliente = new AmazonSQSClient();
+
+        public async Task DeleteAsyncMessage(string QueueUrl, string Id) => await _cliente.DeleteMessageAsync(QueueUrl, Id);
 
         public async Task<List<MessageTratadaResponse<T>>> FetchFileAsyncMessage<T>(MessageRequest request)
         {
-            ReceiveMessageResponse mensagemResponse = await _cliente.ReceiveMessageAsync(request.FilaUrl);
-            if (mensagemResponse == null)
-            {
-                return null;
-            }
+            List<MessageTratadaResponse<T>> vMessagesTratadaResponse = new List<MessageTratadaResponse<T>>();
 
-            List<MessageTratadaResponse<T>> mensagens = new List<MessageTratadaResponse<T>>();
-            foreach (Message mensagem in mensagemResponse.Messages)
+            ReceiveMessageResponse vReceiveMessageResponse = await _cliente.ReceiveMessageAsync(request.FilaUrl);
+
+            if (vReceiveMessageResponse == null)
+                return vMessagesTratadaResponse;
+
+            foreach (Message mensagem in vReceiveMessageResponse.Messages)
             {
                 T mensagemDeserealizada = UnrealizeMessage<T>(mensagem);
                 if (mensagemDeserealizada != null)
                 {
-                    mensagens.Add(new MessageTratadaResponse<T>
+                    vMessagesTratadaResponse.Add(new MessageTratadaResponse<T>
                     {
                         ReceiptHandle = mensagem.ReceiptHandle,
                         Message = mensagemDeserealizada,
@@ -42,11 +37,12 @@ namespace SQS.Queue.Queue
                 }
             }
 
-            return mensagens;
+            return vMessagesTratadaResponse;
         }
 
         public async Task<List<MessageTratadaResponse<T>>> FetchMessageGetsAsyncDeleted<T>(MessageRequest request)
         {
+            List<MessageTratadaResponse<T>> mensagens = new List<MessageTratadaResponse<T>>();
             ReceiveMessageRequest requestSqs = new ReceiveMessageRequest
             {
                 QueueUrl = request.FilaUrl,
@@ -60,10 +56,9 @@ namespace SQS.Queue.Queue
 
             ReceiveMessageResponse mensagemResponse = await _cliente.ReceiveMessageAsync(requestSqs);
 
-            if (mensagemResponse == null)
-                return null;
+            if (mensagemResponse is null)
+                return mensagens;
 
-            List<MessageTratadaResponse<T>> mensagens = new List<MessageTratadaResponse<T>>();
             foreach (Message mensagem in mensagemResponse.Messages)
             {
                 T mensagemDeserealizada = UnrealizeMessage<T>(mensagem);
@@ -85,7 +80,8 @@ namespace SQS.Queue.Queue
         public async Task<MessageResponse> SendFileAsyncMessage<T>(string filaUrl, T request)
         {
             SendMessageResponse response = await _cliente.SendMessageAsync(filaUrl, JsonConvert.SerializeObject(request));
-            if (response != null)
+
+            if (response is not null)
             {
                 return new MessageResponse
                 {
@@ -97,7 +93,7 @@ namespace SQS.Queue.Queue
                 };
             }
 
-            return null;
+            return new MessageResponse();
         }
 
         public T UnrealizeMessage<T>(Message mensagem)
